@@ -8,7 +8,15 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import { useAuthStore } from '@/lib/authStore';
 import { api } from '@/lib/api';
-import { FolderOpen, ExternalLink, Loader2, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import {
+  FolderOpen,
+  ExternalLink,
+  Loader2,
+  Clock,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+} from 'lucide-react';
 import Link from 'next/link';
 
 interface Site {
@@ -57,87 +65,137 @@ export default function DashboardPage() {
   const statusConfig = {
     draft: { variant: 'default' as const, icon: FolderOpen, label: 'Draft' },
     building: { variant: 'warning' as const, icon: Loader2, label: 'Building' },
-    deployed: { variant: 'success' as const, icon: CheckCircle, label: 'Deployed' },
+    deployed: { variant: 'success' as const, icon: CheckCircle, label: 'Live' },
     failed: { variant: 'error' as const, icon: XCircle, label: 'Failed' },
   };
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
+
+        {/* HEADER */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#FAFAFA]">My Sites</h1>
-            <p className="text-[#71717A] mt-1">Manage your created websites</p>
+            <h1 className="text-xl font-semibold text-white tracking-tight">
+              Your Sites
+            </h1>
+            <p className="text-sm text-zinc-500 mt-1">
+              Manage and monitor your deployments
+            </p>
           </div>
+
           <Link href="/builder/templates">
-            <Button>Create New Site</Button>
+            <Button className="bg-indigo-500 hover:bg-indigo-600 text-white">
+              New Site
+            </Button>
           </Link>
         </div>
 
+        {/* LOADING */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-[#71717A] animate-spin" />
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="w-6 h-6 text-zinc-500 animate-spin" />
           </div>
         ) : sites.length === 0 ? (
-          <Card className="p-12">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 rounded-full bg-[#1C1C1F] flex items-center justify-center mb-4">
-                <FolderOpen className="w-8 h-8 text-[#71717A]" />
+
+          /* EMPTY */
+          <Card className="p-12 border border-zinc-800 bg-zinc-900/60 text-center">
+            <div className="flex flex-col items-center">
+              <div className="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center mb-4">
+                <FolderOpen className="w-6 h-6 text-zinc-500" />
               </div>
-              <h3 className="text-lg font-medium text-[#FAFAFA]">No sites yet</h3>
-              <p className="text-[#71717A] mt-1 max-w-sm">
-                Create your first website by selecting a template and filling in your details.
+
+              <h3 className="text-lg font-medium text-white">
+                No sites yet
+              </h3>
+
+              <p className="text-sm text-zinc-500 mt-1 max-w-sm">
+                Start by creating your first site from a template.
               </p>
-              <Link href="/builder/templates" className="mt-4">
-                <Button>Get Started</Button>
+
+              <Link href="/builder/templates" className="mt-5">
+                <Button className="bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700">
+                  Browse Templates
+                </Button>
               </Link>
             </div>
           </Card>
+
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+          /* GRID */
+          <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {sites.map((site) => {
               const status = statusConfig[site.status];
               const StatusIcon = status.icon;
-              
+
               return (
-                <Card key={site.id} className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-12 h-12 rounded-lg bg-linear-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center">
-                      <FolderOpen className="w-6 h-6 text-indigo-400" />
+                <Card
+                  key={site.id}
+                  className="group flex flex-col justify-between p-5 border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 transition-all"
+                >
+
+                  {/* TOP */}
+                  <div className="space-y-4">
+
+                    {/* ICON + STATUS */}
+                    <div className="flex items-start justify-between">
+                      <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center">
+                        <FolderOpen className="w-5 h-5 text-zinc-400" />
+                      </div>
+
+                      <Badge variant={status.variant} className="gap-1 text-xs">
+                        <StatusIcon
+                          className={`w-3 h-3 ${
+                            site.status === 'building' ? 'animate-spin' : ''
+                          }`}
+                        />
+                        {status.label}
+                      </Badge>
                     </div>
-                    <Badge variant={status.variant} className="gap-1">
-                      <StatusIcon className={`w-3 h-3 ${site.status === 'building' ? 'animate-spin' : ''}`} />
-                      {status.label}
-                    </Badge>
+
+                    {/* TEXT */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-white truncate">
+                        {site.siteName}
+                      </h3>
+
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        {site.templateName}
+                      </p>
+                    </div>
+
+                    {/* META */}
+                    <div className="flex items-center gap-2 text-xs text-zinc-500">
+                      <Clock className="w-3 h-3" />
+                      {new Date(site.createdAt).toLocaleDateString()}
+                    </div>
                   </div>
-                  
-                  <h3 className="font-semibold text-[#FAFAFA]">{site.siteName}</h3>
-                  <p className="text-sm text-[#71717A] mt-0.5">{site.templateName}</p>
-                  
-                  <div className="flex items-center gap-2 text-xs text-[#71717A] mt-3">
-                    <Clock className="w-3 h-3" />
-                    {new Date(site.createdAt).toLocaleDateString()}
-                  </div>
-                  
-                  {site.liveUrl && site.status === 'deployed' && (
-                    <div className="flex gap-2 mt-3">
+
+                  {/* ACTIONS */}
+                  {site.status === 'deployed' && site.liveUrl && (
+                    <div className="flex gap-2 mt-5">
+
                       <a
                         href={site.liveUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-[#1C1C1F] text-sm text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#252528] transition-colors"
+                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-sm text-white border border-zinc-700 transition"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        View Site
+                        View
                       </a>
+
                       <button
                         onClick={() => handleRedeploy(site.id)}
-                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[#1C1C1F] text-sm text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#252528] transition-colors"
+                        className="flex items-center justify-center px-3 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white transition"
                       >
                         <RefreshCw className="w-4 h-4" />
                       </button>
+
                     </div>
                   )}
+
                 </Card>
               );
             })}

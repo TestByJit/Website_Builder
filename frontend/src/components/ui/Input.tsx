@@ -29,7 +29,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             className={`
               w-full h-10 px-3 ${icon ? 'pl-10' : ''} 
-              bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-800 rounded-md 
+              bg-white dark:bg-zinc-800/80 border border-gray-300 dark:border-zinc-700/60 rounded-md 
               text-gray-900 dark:text-gray-100 placeholder-gray-400
               focus:outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500
               transition-all duration-200

@@ -1,34 +1,34 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/authStore';
-import { Layout, FolderOpen, Settings, LogOut, User } from 'lucide-react';
+// import { usePathname, useRouter } from 'next/navigation';
+// import { useAuthStore } from '@/lib/authStore';
+// import { Layout, FolderOpen, Settings, LogOut, User } from 'lucide-react';
 
-const navItems = [
-  { href: '/builder/templates', label: 'Templates', icon: Layout },
-  { href: '/dashboard', label: 'My Sites', icon: FolderOpen },
-  { href: '/settings', label: 'Settings', icon: Settings },
-];
+// const navItems = [
+//   { href: '/builder/templates', label: 'Templates', icon: Layout },
+//   { href: '/dashboard', label: 'My Sites', icon: FolderOpen },
+//   { href: '/settings', label: 'Settings', icon: Settings },
+// ];
 
 const Header = () => {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { isAuthenticated, logout, user } = useAuthStore();
+//   const pathname = usePathname();
+//   const router = useRouter();
+//   const { isAuthenticated, logout, user } = useAuthStore();
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
-  };
+//   const handleLogout = () => {
+//     logout();
+//     router.push('/login');
+//   };
 
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-[#141416] border-b border-[#2A2A2E] z-40">
       <div className="h-full px-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
-          <span className="text-lg font-semibold text-white">WebForge</span>
+          <span className="text-lg font-semibold text-white">Realty Builder</span>
         </Link>
 
-        {isAuthenticated && (
+        {/* {isAuthenticated && (
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -51,9 +51,9 @@ const Header = () => {
               );
             })}
           </nav>
-        )}
+        )} */}
 
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           {isAuthenticated ? (
             <div className="flex items-center gap-3">
               <span className="text-sm text-[#A1A1AA]">{user?.email}</span>
@@ -81,7 +81,7 @@ const Header = () => {
               </Link>
             </div>
           )}
-        </div>
+        </div> */}
       </div>
     </header>
   );

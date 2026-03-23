@@ -22,7 +22,7 @@ export default function LoginPage() {
     try {
       const data = await api.auth.login(email, password);
       setAuth(data.token, data.user);
-      router.push('/builder/templates');
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);
     } finally {

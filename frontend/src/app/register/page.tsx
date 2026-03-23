@@ -34,7 +34,7 @@ export default function RegisterPage() {
     try {
       const data = await api.auth.register(email, password);
       setAuth(data.token, data.user);
-      router.push('/builder/templates');
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);
     } finally {

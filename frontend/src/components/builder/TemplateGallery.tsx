@@ -1,81 +1,78 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { templates } from '@/data/templates';
 import TemplateCard from './TemplateCard';
-import { Search } from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-
-const categories = [
-  { value: 'all', label: 'All Templates' },
-  { value: 'portfolio', label: 'Portfolio' },
-  { value: 'business', label: 'Business' },
-  { value: 'blog', label: 'Blog' },
-  { value: 'ecommerce', label: 'E-commerce' },
-  { value: 'landing', label: 'Landing Page' },
-];
+import { Search } from 'lucide-react';
 
 const TemplateGallery = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
 
   const filteredTemplates = useMemo(() => {
-    return templates.filter((template) => {
-      const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        template.description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
-  }, [searchQuery, selectedCategory]);
+    const query = searchQuery.toLowerCase();
+
+    return templates.filter((template) =>
+      template.name.toLowerCase().includes(query) ||
+      template.description.toLowerCase().includes(query) ||
+      template.features.some((f) => f.toLowerCase().includes(query))
+    );
+  }, [searchQuery]);
+
+  // Ctrl + K focus shortcut
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        document.getElementById('template-search')?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+
+      {/* HEADER */}
+      <div className="flex items-center justify-between">
+
         <div>
-          <h1 className="text-2xl font-bold text-[#FAFAFA]">Choose a Template</h1>
-          <p className="text-[#71717A] mt-1">Select a template to get started with your website</p>
+          <h1 className="text-xl font-semibold text-white tracking-tight">
+            Templates
+          </h1>
+          <p className="text-sm text-zinc-500 mt-1">
+            Start with a template and customize
+          </p>
         </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
-            <Input
-              placeholder="Ctrl + K"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-5"
-            />
+
+        {/* MINIMAL SEARCH */}
+        <div className="relative w-56">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+
+          <Input
+            id="template-search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-9 pl-9 pr-16 bg-zinc-900/70 border border-zinc-800 text-sm text-white placeholder:text-zinc-500 focus:ring-0 focus:border-zinc-700"
+          />
+
+          {/* Ctrl + K hint */}
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 border border-zinc-700 px-1.5 py-0.5 rounded">
+            Ctrl K
           </div>
-          {/* <div className="flex gap-1 p-1 bg-[#1C1C1F] rounded-lg border border-[#2A2A2E]">
-            {categories.map((category) => (
-              <button
-                key={category.value}
-                onClick={() => setSelectedCategory(category.value)}
-                className={`
-                  px-3 py-1.5 rounded-md text-sm font-medium transition-all
-                  ${selectedCategory === category.value
-                    ? 'bg-[#2A2A2E] text-[#FAFAFA]'
-                    : 'text-[#71717A] hover:text-[#A1A1AA]'
-                  }
-                `}
-              >
-                {category.label}
-              </button>
-            ))}
-          </div> */}
         </div>
+
       </div>
 
+      {/* GRID */}
       {filteredTemplates.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="w-16 h-16 rounded-full bg-[#1C1C1F] flex items-center justify-center mb-4">
-            <Search className="w-8 h-8 text-[#71717A]" />
-          </div>
-          <h3 className="text-lg font-medium text-[#FAFAFA]">No templates found</h3>
-          <p className="text-[#71717A] mt-1">Try adjusting your search or filter criteria</p>
+        <div className="py-20 text-center text-zinc-500 text-sm">
+          No templates found
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
+        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {filteredTemplates.map((template) => (
             <TemplateCard key={template.id} template={template} />
           ))}
