@@ -8,17 +8,15 @@ export interface AuthRequest extends Request {
 }
 
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const token = req.cookies.token;
+
+  if (!token) {
     return res.status(401).json({
       success: false,
-      error: 'No token provided',
+      error: 'Not authenticated',
     });
   }
-  
-  const token = authHeader.split(' ')[1];
-  
+
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
     req.userId = decoded.userId;
@@ -33,4 +31,8 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
 
 export function generateToken(userId: string): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+}
+
+export function generateRefreshToken(userId: string): string {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
 }

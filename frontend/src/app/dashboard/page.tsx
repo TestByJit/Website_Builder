@@ -42,6 +42,17 @@ export default function DashboardPage() {
     fetchSites();
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    const hasBuilding = sites.some(s => s.status === 'building');
+    if (!hasBuilding) return;
+
+    const interval = setInterval(() => {
+      fetchSites();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [sites]);
+
   const fetchSites = async () => {
     try {
       const data = await api.sites.list();
@@ -56,7 +67,7 @@ export default function DashboardPage() {
   const handleRedeploy = async (siteId: string) => {
     try {
       await api.sites.redeploy(siteId);
-      await fetchSites();
+      fetchSites();
     } catch (error) {
       console.error('Failed to redeploy:', error);
     }

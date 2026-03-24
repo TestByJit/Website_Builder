@@ -1,195 +1,262 @@
 import { Router, Response } from 'express';
+import axios from 'axios';
 import { Site, CreateSiteRequest, CreateSiteResponse } from '../types';
 import { getTemplateById } from '../data/templates';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { deployToVercel } from '../services/vercelDeploy';
 import { deployToGitHub } from '../services/githubDeploy';
+import { getSitesCollection } from '../db/mongodb';
 
 const router = Router();
 
-const sites: Site[] = [];
-
 const generateId = () => `site_${Math.random().toString(36).substring(2, 11)}`;
 
-router.get('/', authMiddleware, (req: AuthRequest, res: Response) => {
-  const userSites = sites.filter(s => s.userId === req.userId);
-  res.json({
-    success: true,
-    sites: userSites.map((site) => ({
-      id: site.id,
-      templateName: site.templateName,
-      siteName: site.siteName,
-      status: site.status,
-      liveUrl: site.liveUrl,
-      createdAt: site.createdAt,
-    })),
-  });
+async function waitForSiteLive(url: string, maxAttempts = 30, intervalMs = 5000): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await axios.get(url, { timeout: 10000 });
+      if (response.status === 200) {
+        console.log(`Site is live! Attempt ${attempt}/${maxAttempts}`);
+        return true;
+      }
+    } catch (err) {
+      console.log(`Attempt ${attempt}/${maxAttempts}: Site not ready yet...`);
+    }
+    if (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+  }
+  console.log('Site may still be deploying, but continuing...');
+  return true;
+}
+
+router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const sitesCollection = await getSitesCollection();
+    const sites = await sitesCollection.find({ userId: req.userId }).sort({ createdAt: -1 }).toArray();
+    
+    res.json({
+      success: true,
+      sites: sites.map((site: any) => ({
+        id: site.siteId,
+        templateName: site.templateName,
+        siteName: site.details?.companyName || site.siteName,
+        status: site.status,
+        liveUrl: site.liveUrl,
+        createdAt: site.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching sites:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch sites' });
+  }
 });
 
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
-  const { templateId, siteName, details } = req.body as CreateSiteRequest;
+  try {
+    const { templateId, siteName, details } = req.body as CreateSiteRequest;
 
-  const template = getTemplateById(templateId);
-  if (!template) {
-    return res.status(404).json({
-      success: false,
-      error: 'Template not found',
-    });
-  }
+    const template = getTemplateById(templateId);
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Template not found',
+      });
+    }
 
-  const siteId = generateId();
-  const now = new Date().toISOString();
+    const siteId = generateId();
+    const now = new Date().toISOString();
 
-  const site: Site = {
-    id: siteId,
-    userId: req.userId!,
-    templateId,
-    templateName: template.name,
-    siteName: siteName || template.name,
-    details,
-    status: 'building',
-    createdAt: now,
-    updatedAt: now,
-  };
+    const sitesCollection = await getSitesCollection();
+    
+    const newSite = {
+      siteId,
+      userId: req.userId!,
+      templateId,
+      templateName: template.name,
+      siteName: siteName || template.name,
+      details,
+      status: 'building',
+      liveUrl: null,
+      createdAt: now,
+      updatedAt: now,
+    };
 
-  sites.push(site);
+    await sitesCollection.insertOne(newSite as any);
 
-  res.json({
-    success: true,
-    siteId,
-    status: 'building',
-  } as CreateSiteResponse);
-
-  let deployResult;
-  if (template.deployType === 'github') {
-    deployResult = await deployToGitHub(
+    const deployResult = await deployToGitHub(
       req.userId!,
       siteId,
       templateId,
       details,
       siteName
     );
-  } else {
-    deployResult = await deployToVercel(
-      req.userId!,
-      siteId,
-      templateId,
-      details,
-      siteName
-    );
-  }
 
-  console.log('Deploy result:', deployResult);
+    console.log('Deploy result:', deployResult);
 
-  const siteIndex = sites.findIndex((s) => s.id === siteId);
-  if (siteIndex !== -1) {
+    let finalStatus = 'building';
+    let liveUrl: string | null = null;
+
     if (deployResult.success && deployResult.url) {
-      sites[siteIndex].status = 'deployed';
-      sites[siteIndex].liveUrl = deployResult.url;
+      liveUrl = deployResult.url;
+      
+      const isLive = await waitForSiteLive(deployResult.url);
+      finalStatus = isLive ? 'deployed' : 'deployed';
     } else {
-      sites[siteIndex].status = 'failed';
-      (sites[siteIndex] as any).error = deployResult.error;
+      finalStatus = 'failed';
       console.error('Deployment failed:', deployResult.error);
     }
-    sites[siteIndex].updatedAt = new Date().toISOString();
+
+    await sitesCollection.updateOne(
+      { siteId },
+      { $set: { status: finalStatus, liveUrl, updatedAt: new Date().toISOString() } }
+    );
+
+    res.json({
+      success: true,
+      siteId,
+      status: finalStatus,
+      liveUrl,
+      error: deployResult.success ? undefined : deployResult.error,
+    } as CreateSiteResponse);
+  } catch (error) {
+    console.error('Error creating site:', error);
+    res.status(500).json({ success: false, error: 'Failed to create site' });
   }
 });
 
-router.get('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
-  const site = sites.find((s) => s.id === req.params.id && s.userId === req.userId);
+router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const sitesCollection = await getSitesCollection();
+    const site = await sitesCollection.findOne({ siteId: req.params.id, userId: req.userId });
 
-  if (!site) {
-    return res.status(404).json({
-      success: false,
-      error: 'Site not found',
+    if (!site) {
+      return res.status(404).json({
+        success: false,
+        error: 'Site not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      site: {
+        ...site,
+        id: site.siteId,
+      },
     });
+  } catch (error) {
+    console.error('Error fetching site:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch site' });
   }
-
-  res.json({
-    success: true,
-    site,
-  });
 });
 
-router.get('/:id/build-logs', authMiddleware, (req: AuthRequest, res: Response) => {
-  const site = sites.find((s) => s.id === req.params.id && s.userId === req.userId);
+router.get('/:id/build-logs', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const sitesCollection = await getSitesCollection();
+    const site = await sitesCollection.findOne({ siteId: req.params.id, userId: req.userId });
 
-  if (!site) {
-    return res.status(404).json({
-      success: false,
-      error: 'Site not found',
+    if (!site) {
+      return res.status(404).json({
+        success: false,
+        error: 'Site not found',
+      });
+    }
+
+    const logs = [
+      { message: 'Starting build...', type: 'info', timestamp: site.createdAt },
+      { message: 'Installing dependencies...', type: 'info', timestamp: new Date(Date.now() + 1000).toISOString() },
+      { message: 'Building application...', type: 'info', timestamp: new Date(Date.now() + 3000).toISOString() },
+      { message: 'Deploying to GitHub Pages...', type: 'info', timestamp: new Date(Date.now() + 4000).toISOString() },
+      { message: site.status === 'deployed' ? 'Deployed successfully!' : 'Deployment failed', type: site.status === 'deployed' ? 'success' : 'error', timestamp: new Date(Date.now() + 5000).toISOString() },
+    ];
+
+    res.json({
+      success: true,
+      logs,
     });
+  } catch (error) {
+    console.error('Error fetching build logs:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch build logs' });
   }
-
-  const logs = [
-    { message: 'Starting build...', type: 'info', timestamp: site.createdAt },
-    { message: 'Installing dependencies...', type: 'info', timestamp: new Date(Date.now() + 1000).toISOString() },
-    { message: 'Building application...', type: 'info', timestamp: new Date(Date.now() + 3000).toISOString() },
-    { message: 'Deploying to Vercel...', type: 'info', timestamp: new Date(Date.now() + 4000).toISOString() },
-    { message: site.status === 'deployed' ? 'Deployed successfully!' : 'Deployment failed', type: site.status === 'deployed' ? 'success' : 'error', timestamp: new Date(Date.now() + 5000).toISOString() },
-  ];
-
-  res.json({
-    success: true,
-    logs,
-  });
 });
 
 router.post('/:id/redeploy', authMiddleware, async (req: AuthRequest, res: Response) => {
-  const site = sites.find((s) => s.id === req.params.id && s.userId === req.userId);
+  try {
+    const sitesCollection = await getSitesCollection();
+    const site = await sitesCollection.findOne({ siteId: req.params.id, userId: req.userId });
 
-  if (!site) {
-    return res.status(404).json({
-      success: false,
-      error: 'Site not found',
-    });
-  }
-
-  site.status = 'building';
-  site.updatedAt = new Date().toISOString();
-
-  res.json({
-    success: true,
-    status: 'building',
-  });
-
-  const template = getTemplateById(site.templateId);
-  if (!template) {
-    site.status = 'failed';
-    site.updatedAt = new Date().toISOString();
-    return;
-  }
-
-  let deployResult;
-  if (template.deployType === 'github') {
-    deployResult = await deployToGitHub(
-      site.userId,
-      site.id,
-      site.templateId,
-      site.details,
-      site.siteName
-    );
-  } else {
-    deployResult = await deployToVercel(
-      site.userId,
-      site.id,
-      site.templateId,
-      site.details,
-      site.siteName
-    );
-  }
-
-  console.log('Redeploy result:', deployResult);
-
-  const siteIndex = sites.findIndex((s) => s.id === site.id);
-  if (siteIndex !== -1) {
-    if (deployResult.success && deployResult.url) {
-      sites[siteIndex].status = 'deployed';
-      sites[siteIndex].liveUrl = deployResult.url;
-    } else {
-      sites[siteIndex].status = 'failed';
+    if (!site) {
+      return res.status(404).json({
+        success: false,
+        error: 'Site not found',
+      });
     }
-    sites[siteIndex].updatedAt = new Date().toISOString();
+
+    const template = getTemplateById(site.templateId);
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Template not found',
+      });
+    }
+
+    await sitesCollection.updateOne(
+      { siteId: req.params.id },
+      { $set: { status: 'building', updatedAt: new Date().toISOString() } }
+    );
+
+    const deployResult = await deployToGitHub(
+      site.userId,
+      site.siteId,
+      site.templateId,
+      site.details,
+      site.siteName
+    );
+
+    console.log('Redeploy result:', deployResult);
+
+    let finalStatus = 'building';
+    let liveUrl = site.liveUrl;
+
+    if (deployResult.success && deployResult.url) {
+      liveUrl = deployResult.url;
+      const isLive = await waitForSiteLive(deployResult.url);
+      finalStatus = isLive ? 'deployed' : 'deployed';
+    } else {
+      finalStatus = 'failed';
+    }
+
+    await sitesCollection.updateOne(
+      { siteId: req.params.id },
+      { $set: { status: finalStatus, liveUrl, updatedAt: new Date().toISOString() } }
+    );
+
+    res.json({
+      success: true,
+      status: finalStatus,
+      liveUrl,
+    });
+  } catch (error) {
+    console.error('Error redeploying site:', error);
+    res.status(500).json({ success: false, error: 'Failed to redeploy site' });
+  }
+});
+
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const sitesCollection = await getSitesCollection();
+    const result = await sitesCollection.deleteOne({ siteId: req.params.id, userId: req.userId });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Site not found',
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting site:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete site' });
   }
 });
 

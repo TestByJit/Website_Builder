@@ -1,20 +1,17 @@
 'use client';
 
-// import Header from './Header';
-// import Sidebar from './Sidebar';
+import Header from './Header';
 import { ReactNode } from 'react';
 
 interface AppLayoutProps {
   children: ReactNode;
-  hideSidebar?: boolean;
 }
 
-const AppLayout = ({ children, hideSidebar = false }: AppLayoutProps) => {
+const AppLayout = ({ children }: AppLayoutProps) => {
   return (
     <div className="min-h-screen bg-[#0A0A0B]">
-      {/* <Header /> */}
-      {/* {!hideSidebar && <Sidebar />} */}
-      <main className={`min-h-screen transition-all duration-200`}>  {/* ${!hideSidebar ? 'sm:pl-56' : ''} */}
+      <Header />
+      <main className="pt-14 min-h-screen">
         <div className="p-4 sm:p-6 max-w-8xl mx-auto">
           {children}
         </div>

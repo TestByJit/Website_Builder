@@ -6,6 +6,7 @@ interface ProgressProps {
   size?: 'sm' | 'md' | 'lg';
   showLabel?: boolean;
   variant?: 'default' | 'success' | 'warning';
+  className?: string;
 }
 
 const Progress = ({ 
@@ -13,7 +14,8 @@ const Progress = ({
   max = 100, 
   size = 'md', 
   showLabel = false,
-  variant = 'default' 
+  variant = 'default',
+  className = '' 
 }: ProgressProps) => {
   const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
 
@@ -30,7 +32,7 @@ const Progress = ({
   };
 
   return (
-    <div className="w-full space-y-1">
+    <div className={`w-full space-y-1 ${className}`}>
       {showLabel && (
         <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
           <span>Progress</span>

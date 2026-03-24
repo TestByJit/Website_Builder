@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ThemeProvider } from "@/lib/ThemeProvider";
+import { AuthProvider } from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "WebForge - Professional Website Builder",
-  description: "Build professional websites with beautiful templates",
+  title: "WebForge - Real Estate Website Builder",
+  description: "Build professional real estate websites in minutes",
 };
 
 export default function RootLayout({
@@ -17,9 +18,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
         <ThemeProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+          <AuthProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

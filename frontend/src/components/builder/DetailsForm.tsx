@@ -7,7 +7,6 @@ import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import Progress from '@/components/ui/Progress';
 import { api } from '@/lib/api';
 import { ArrowLeft, ArrowRight, Loader2, Check } from 'lucide-react';
 import Link from 'next/link';
@@ -73,22 +72,14 @@ export default function DetailsForm({ template }: DetailsFormProps) {
   /* ---------------- SUBMIT ---------------- */
   const handleSubmit = async () => {
     setIsBuilding(true);
-    setProgress(0);
 
     const siteId = 'site_' + Math.random().toString(36).slice(2, 10);
 
-    const interval = setInterval(() => {
-      setProgress(p => Math.min(p + Math.random() * 20, 100));
-    }, 400);
-
     try {
-      const res = await api.sites.create(template.id, siteId, formData);
-
-      if (res.success) {
-        setTimeout(() => router.push('/dashboard'), 1200);
-      }
-    } catch {
-      clearInterval(interval);
+      await api.sites.create(template.id, siteId, formData);
+      router.push('/dashboard');
+    } catch (err) {
+      console.error('Build error:', err);
       setIsBuilding(false);
     }
   };
@@ -138,8 +129,11 @@ export default function DetailsForm({ template }: DetailsFormProps) {
   if (isBuilding) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
-        <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
-        <Progress value={progress} className="w-64" />
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        <div className="text-center">
+          <h3 className="text-white font-medium text-lg">Creating your site...</h3>
+          <p className="text-zinc-500 text-sm mt-2">You will be redirected to your dashboard</p>
+        </div>
       </div>
     );
   }

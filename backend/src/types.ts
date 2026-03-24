@@ -9,11 +9,11 @@ export interface Template {
   id: string;
   name: string;
   description: string;
-  category: 'portfolio' | 'business' | 'blog' | 'ecommerce' | 'landing';
+  category: 'business';
   thumbnail: string;
   features: string[];
   formSchema: FormField[];
-  deployType?: 'vercel' | 'github';
+  deployType: 'github';
 }
 
 export interface FormField {
@@ -36,7 +36,6 @@ export interface Site {
   status: 'draft' | 'building' | 'deployed' | 'failed';
   previewUrl?: string;
   liveUrl?: string;
-  vercelProjectId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,7 +49,12 @@ export interface CreateSiteRequest {
 export interface CreateSiteResponse {
   success: boolean;
   siteId: string;
-  status: string;
+  status: 'draft' | 'building' | 'deployed' | 'failed';
   previewUrl?: string;
   liveUrl?: string;
+  error?: string;
+}
+
+export interface SiteDocument extends Site {
+  _id: string;
 }
