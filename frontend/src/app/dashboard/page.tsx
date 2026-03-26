@@ -16,6 +16,8 @@ import {
   CheckCircle,
   XCircle,
   RefreshCw,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -70,6 +72,21 @@ export default function DashboardPage() {
       fetchSites();
     } catch (error) {
       console.error('Failed to redeploy:', error);
+    }
+  };
+
+  const handleDelete = async (siteId: string) => {
+    if (!confirm('Are you sure you want to delete this site? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/sites/${siteId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      fetchSites();
+    } catch (error) {
+      console.error('Failed to delete:', error);
     }
   };
 
@@ -184,28 +201,42 @@ export default function DashboardPage() {
                   </div>
 
                   {/* ACTIONS */}
-                  {site.status === 'deployed' && site.liveUrl && (
-                    <div className="flex gap-2 mt-5">
+                  <div className="flex gap-2 mt-5">
+                    {site.status === 'deployed' && site.liveUrl && (
+                      <>
+                        <a
+                          href={site.liveUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-sm text-white border border-zinc-700 transition"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          View
+                        </a>
 
-                      <a
-                        href={site.liveUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-sm text-white border border-zinc-700 transition"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        View
-                      </a>
+                        <button
+                          onClick={() => handleRedeploy(site.id)}
+                          className="flex items-center justify-center px-3 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white transition"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
 
-                      <button
-                        onClick={() => handleRedeploy(site.id)}
-                        className="flex items-center justify-center px-3 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white transition"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
+                    <Link
+                      href={`/builder/edit/${site.id}`}
+                      className="flex items-center justify-center px-3 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white transition"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Link>
 
-                    </div>
-                  )}
+                    <button
+                      onClick={() => handleDelete(site.id)}
+                      className="flex items-center justify-center px-3 rounded-md bg-zinc-800 hover:bg-red-900/50 border border-zinc-700 text-zinc-300 hover:text-red-400 transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
 
                 </Card>
               );

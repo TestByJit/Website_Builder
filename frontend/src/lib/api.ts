@@ -85,6 +85,31 @@ export const api = {
       fetchWithAuth(`/sites/${id}/redeploy`, {
         method: 'POST',
       }),
+    update: async (siteId: string, details: Record<string, string>, imageFile?: File) => {
+      const formData = new FormData();
+      formData.append('details', JSON.stringify(details));
+      if (imageFile) {
+        formData.append('agentPhoto', imageFile);
+      }
+
+      const apiUrl = typeof window !== 'undefined'
+        ? (localStorage.getItem('backend_url') || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api')
+        : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
+      const response = await fetch(`${apiUrl}/sites/${siteId}`, {
+        method: 'PUT',
+        body: formData,
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update site');
+      }
+
+      return data;
+    },
   },
 };
 

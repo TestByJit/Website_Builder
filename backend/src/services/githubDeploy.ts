@@ -2131,16 +2131,13 @@ export async function deployToGitHub(
     }
 
     try {
-      await octokit.repos.createPagesSite({
+      await octokit.repos.createPagesBuild({
         owner: ORG,
         repo: repoName,
-        source: {
-          branch: 'main',
-          path: '/',
-        },
       });
-    } catch (err) {
-      console.log('Pages site may already exist');
+      console.log('Triggered new GitHub Pages build');
+    } catch (err: any) {
+      console.log('Pages build trigger error:', err.message);
     }
 
     const url = `https://${ORG}.github.io/${repoName}/`;

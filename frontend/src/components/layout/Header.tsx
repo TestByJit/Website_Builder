@@ -7,7 +7,6 @@ import { api } from '@/lib/api';
 import { LogOut, Menu, X, Sun, Moon } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/lib/ThemeProvider';
-import Image from 'next/image';
 import { Setting06Icon } from 'hugeicons-react';
 
 const Header = () => {
@@ -32,13 +31,12 @@ const Header = () => {
       <header className="fixed top-0 left-0 right-0 h-14 bg-[#141416] border-b border-[#2A2A2E] z-40">
         <div className="h-full px-4 flex items-center justify-between max-w-8xl mx-auto">
           <Link href="/" className="flex items-center gap-2.5">
-            <Image
-              src="/realty_crm.webp" // Use the imported image object
+            <img
+              src="/realty_crm.webp"
               alt="Site Logo"
               width={30}
               height={30}
-              priority // Prioritize loading of the logo
-              className='rounded-lg shadow-inner' // Optional: Add rounded corners to the logo
+              className='rounded-lg shadow-inner'
             />
           </Link>
 
@@ -77,12 +75,11 @@ const Header = () => {
           </button>
 
           <Link href="/dashboard" className="flex items-center gap-2.5">
-            <Image
+            <img
               src="/realty_crm.webp"
               alt="Site Logo"
               width={30}
               height={30}
-              priority
               className='rounded-lg shadow-inner'
             />
           </Link>

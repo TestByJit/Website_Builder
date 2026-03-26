@@ -171,6 +171,77 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.put('/:id', authMiddleware, upload.single('agentPhoto'), async (req: AuthRequest, res: Response) => {
+  try {
+    const sitesCollection = await getSitesCollection();
+    const site = await sitesCollection.findOne({ siteId: req.params.id, userId: req.userId });
+
+    if (!site) {
+      return res.status(404).json({
+        success: false,
+        error: 'Site not found',
+      });
+    }
+
+    let details = site.details || {};
+    if (req.body.details) {
+      if (typeof req.body.details === 'string') {
+        details = { ...site.details, ...JSON.parse(req.body.details) };
+      } else {
+        details = { ...site.details, ...req.body.details };
+      }
+    }
+
+    const template = getTemplateById(site.templateId);
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Template not found',
+      });
+    }
+
+    await sitesCollection.updateOne(
+      { siteId: req.params.id },
+      { $set: { details, status: 'building', updatedAt: new Date().toISOString() } }
+    );
+
+    const deployResult = await deployToGitHub(
+      site.userId,
+      site.siteId,
+      site.templateId,
+      details,
+      site.siteName,
+      req.file ? req.file.buffer : undefined,
+      req.file ? req.file.mimetype : undefined
+    );
+
+    let finalStatus = 'building';
+    let liveUrl = site.liveUrl;
+
+    if (deployResult.success && deployResult.url) {
+      liveUrl = deployResult.url;
+      const isLive = await waitForSiteLive(deployResult.url);
+      finalStatus = isLive ? 'deployed' : 'deployed';
+    } else {
+      finalStatus = 'failed';
+    }
+
+    await sitesCollection.updateOne(
+      { siteId: req.params.id },
+      { $set: { status: finalStatus, liveUrl, updatedAt: new Date().toISOString() } }
+    );
+
+    res.json({
+      success: true,
+      status: finalStatus,
+      liveUrl,
+    });
+  } catch (error: any) {
+    console.error('Error updating site:', error);
+    res.status(500).json({ success: false, error: 'Failed to update site' });
+  }
+});
+
 router.get('/:id/build-logs', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const sitesCollection = await getSitesCollection();
