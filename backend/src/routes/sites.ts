@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import axios from 'axios';
+import multer from 'multer';
 import { Site, CreateSiteRequest, CreateSiteResponse } from '../types';
 import { getTemplateById } from '../data/templates';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
@@ -7,6 +8,10 @@ import { deployToGitHub } from '../services/githubDeploy';
 import { getSitesCollection } from '../db/mongodb';
 
 const router = Router();
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 const generateId = () => `site_${Math.random().toString(36).substring(2, 11)}`;
 
@@ -51,9 +56,18 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/', authMiddleware, upload.single('agentPhoto'), async (req: AuthRequest, res: Response) => {
   try {
-    const { templateId, siteName, details } = req.body as CreateSiteRequest;
+    const templateId = req.body.templateId;
+    const siteName = req.body.siteName;
+    let details = {};
+    if (req.body.details) {
+      if (typeof req.body.details === 'string') {
+        details = JSON.parse(req.body.details);
+      } else {
+        details = req.body.details;
+      }
+    }
 
     const template = getTemplateById(templateId);
     if (!template) {
@@ -62,6 +76,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         error: 'Template not found',
       });
     }
+
+    const imageBuffer = req.file ? req.file.buffer : null;
+    const imageContentType = req.file ? req.file.mimetype : null;
 
     const siteId = generateId();
     const now = new Date().toISOString();
@@ -88,10 +105,14 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       siteId,
       templateId,
       details,
-      siteName
+      siteName,
+      imageBuffer,
+      imageContentType
     );
 
     console.log('Deploy result:', deployResult);
+    console.log('GITHUB_TOKEN:', process.env.GITHUB_TOKEN ? 'set' : 'NOT SET');
+    console.log('ORG:', process.env.GITHUB_ORG);
 
     let finalStatus = 'building';
     let liveUrl: string | null = null;
@@ -118,9 +139,10 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       liveUrl,
       error: deployResult.success ? undefined : deployResult.error,
     } as CreateSiteResponse);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating site:', error);
-    res.status(500).json({ success: false, error: 'Failed to create site' });
+    console.error('Stack:', error.stack);
+    res.status(500).json({ success: false, error: 'Failed to create site', details: error.message });
   }
 });
 

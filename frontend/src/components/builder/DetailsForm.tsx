@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Template, FormField } from '@/types';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
@@ -8,7 +8,7 @@ import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { api } from '@/lib/api';
-import { ArrowLeft, ArrowRight, Loader2, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Check, Upload, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -21,18 +21,37 @@ export default function DetailsForm({ template }: DetailsFormProps) {
 
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [imageFiles, setImageFiles] = useState<Record<string, File>>({});
+  const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
+  const [fileInputRefs, setFileInputRefs] = useState<Record<string, (el: HTMLInputElement | null) => void>>({});
   const [previewData, setPreviewData] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isBuilding, setIsBuilding] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  const fileInputElements = useRef<Record<string, HTMLInputElement>>({});
+
+  useEffect(() => {
+    const callbacks: Record<string, (el: HTMLInputElement | null) => void> = {};
+    template.formSchema.forEach(f => {
+      if (f.type === 'file') {
+        callbacks[f.id] = (el: HTMLInputElement | null) => {
+          if (el) fileInputElements.current[f.id] = el;
+        };
+      }
+    });
+    setFileInputRefs(callbacks);
+  }, [template]);
+
   /* ---------------- FIELD GROUPING (AUTO) ---------------- */
   const steps = useMemo(() => {
     const required = template.formSchema.filter(f => f.required);
+    const fileFields = template.formSchema.filter(f => f.type === 'file');
+    const allShown = [...required, ...fileFields];
 
     return [
-      { label: 'Basic', fields: required.slice(0, Math.ceil(required.length / 2)) },
-      { label: 'Content', fields: required.slice(Math.ceil(required.length / 2)) },
+      { label: 'Basic', fields: allShown.slice(0, Math.ceil(allShown.length / 2)) },
+      { label: 'Content', fields: allShown.slice(Math.ceil(allShown.length / 2)) },
     ];
   }, [template]);
 
@@ -49,6 +68,35 @@ export default function DetailsForm({ template }: DetailsFormProps) {
     }
   };
 
+  /* ---------------- FILE UPLOAD ---------------- */
+  const handleFileChange = (id: string, file: File | null) => {
+    if (file) {
+      setImageFiles(prev => ({ ...prev, [id]: file }));
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreviews(prev => ({ ...prev, [id]: e.target?.result as string }));
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const newFiles = { ...imageFiles };
+      delete newFiles[id];
+      setImageFiles(newFiles);
+      
+      const newPreviews = { ...imagePreviews };
+      delete newPreviews[id];
+      setImagePreviews(newPreviews);
+    }
+  };
+
+  const removeImage = (id: string) => {
+    handleFileChange(id, null);
+    const el = fileInputElements.current[id];
+    if (el) {
+      el.value = '';
+    }
+  };
+
   /* ---------------- LIVE PREVIEW ---------------- */
   useEffect(() => {
     const t = setTimeout(() => setPreviewData(formData), 150);
@@ -60,7 +108,11 @@ export default function DetailsForm({ template }: DetailsFormProps) {
     const newErrors: Record<string, string> = {};
 
     currentFields.forEach(f => {
-      if (!formData[f.id]?.trim()) {
+      if (f.type === 'file') {
+        if (f.required && !imageFiles[f.id]) {
+          newErrors[f.id] = 'Required';
+        }
+      } else if (!formData[f.id]?.trim()) {
         newErrors[f.id] = 'Required';
       }
     });
@@ -76,13 +128,39 @@ export default function DetailsForm({ template }: DetailsFormProps) {
     const siteId = 'site_' + Math.random().toString(36).slice(2, 10);
 
     try {
-      await api.sites.create(template.id, siteId, formData);
+      const formDataToSend = new FormData();
+      formDataToSend.append('templateId', template.id);
+      formDataToSend.append('siteName', siteId);
+      formDataToSend.append('details', JSON.stringify(formData));
+      
+      Object.entries(imageFiles).forEach(([fieldId, file]) => {
+        formDataToSend.append(fieldId, file);
+      });
+
+      const apiUrl = typeof window !== 'undefined' 
+        ? (localStorage.getItem('backend_url') || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api')
+        : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
+      const response = await fetch(`${apiUrl}/sites`, {
+        method: 'POST',
+        body: formDataToSend,
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create site');
+      }
+
       router.push('/dashboard');
     } catch (err) {
       console.error('Build error:', err);
       setIsBuilding(false);
     }
   };
+
+  /* ---------------- BUTTON LABEL ---------------- */
 
   /* ---------------- FIELD RENDER ---------------- */
   const renderField = (field: FormField) => {
@@ -111,6 +189,54 @@ export default function DetailsForm({ template }: DetailsFormProps) {
           onChange={(e) => handleChange(field.id, e.target.value)}
           error={error}
         />
+      );
+    }
+
+    if (field.type === 'file') {
+      const preview = imagePreviews[field.id];
+      const callbackRef = fileInputRefs[field.id];
+      
+      return (
+        <div key={field.id} className="col-span-full">
+          <label className="block text-sm font-medium text-zinc-300 mb-2">
+            {field.label}
+          </label>
+          {preview ? (
+            <div className="relative inline-block">
+              <img 
+                src={preview} 
+                alt="Preview" 
+                className="w-32 h-32 object-cover rounded-lg border border-zinc-700"
+              />
+              <button
+                type="button"
+                onClick={() => removeImage(field.id)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div
+              onClick={() => fileInputElements.current[field.id]?.click()}
+              className="border-2 border-dashed border-zinc-700 rounded-lg p-6 text-center cursor-pointer hover:border-zinc-500 transition-colors"
+            >
+              <Upload className="w-8 h-8 mx-auto text-zinc-500 mb-2" />
+              <p className="text-sm text-zinc-400">Click to upload photo</p>
+              <p className="text-xs text-zinc-600 mt-1">PNG, JPG, WebP up to 5MB</p>
+            </div>
+          )}
+          <input
+            ref={callbackRef}
+            type="file"
+            accept={field.accept || 'image/*'}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              handleFileChange(field.id, file);
+            }}
+          />
+        </div>
       );
     }
 
@@ -219,19 +345,16 @@ export default function DetailsForm({ template }: DetailsFormProps) {
 
               {/* LIVE OVERLAY */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-black/20 p-3 sm:p-4 flex flex-col justify-end">
-
+                {imagePreviews.agentPhoto ? (
+                  <img 
+                    src={imagePreviews.agentPhoto} 
+                    alt="Preview" 
+                    className="w-16 h-16 object-cover rounded-full border-2 border-white/30 mb-2"
+                  />
+                ) : null}
                 <h2 className="text-white text-base sm:text-lg font-semibold">
                   {previewData.companyName || 'Your Company'}
                 </h2>
-
-                <p className="text-sm text-zinc-300">
-                  {previewData.heroSubtitle || 'Your tagline'}
-                </p>
-
-                <div className="mt-1 sm:mt-2 text-xs text-zinc-400">
-                  {previewData.email || 'contact@email.com'}
-                </div>
-
               </div>
             </div>
           </Card>

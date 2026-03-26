@@ -22,7 +22,7 @@ export const templates: Template[] = [
       { id: 'yearsExp', type: 'text', label: 'Years Experience', placeholder: '15+', required: false },
       { id: 'rating', type: 'text', label: 'Rating', placeholder: '5.0', required: false },
       { id: 'teamRank', type: 'text', label: 'Team Rank', placeholder: '#1', required: false },
-      { id: 'agentPhotoUrl', type: 'url', label: 'Agent Photo URL', placeholder: 'https://images.unsplash.com/photo-...', required: false },
+      { id: 'agentPhoto', type: 'file', label: 'Upload Agent Photo', accept: 'image/*', required: true },
       { id: 'neighborhood1', type: 'text', label: 'Neighborhood 1', placeholder: 'Downtown', required: false },
       { id: 'price1', type: 'text', label: 'Avg Price 1', placeholder: '$1,500,000', required: false },
       { id: 'neighborhood2', type: 'text', label: 'Neighborhood 2', placeholder: 'West Side', required: false },

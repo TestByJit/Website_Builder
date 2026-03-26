@@ -11,12 +11,13 @@ export interface Template {
 
 export interface FormField {
   id: string;
-  type: 'text' | 'textarea' | 'email' | 'url' | 'select' | 'image' | 'color';
+  type: 'text' | 'textarea' | 'email' | 'url' | 'select' | 'image' | 'color' | 'file';
   label: string;
   placeholder?: string;
   required: boolean;
   options?: string[];
   step?: number;
+  accept?: string;
 }
 
 export interface Site {

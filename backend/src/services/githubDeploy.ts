@@ -2003,7 +2003,9 @@ export async function deployToGitHub(
   siteId: string,
   templateId: string,
   details: Record<string, string>,
-  siteName?: string
+  siteName?: string,
+  imageBuffer?: Buffer | null,
+  imageContentType?: string | null
 ): Promise<DeployResult> {
   const token = process.env.GITHUB_TOKEN;
   
@@ -2043,7 +2045,51 @@ export async function deployToGitHub(
       }
     }
 
-    const html = generateRealEstateHTML(details);
+    let agentPhotoUrl = details.agentPhotoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&q=80';
+    
+    if (imageBuffer && imageContentType) {
+      console.log('Processing uploaded agent photo...');
+      const sharp = (await import('sharp')).default;
+      
+      const resizedBuffer = await sharp(imageBuffer)
+        .resize(800, 1000, { fit: 'cover', position: 'top' })
+        .webp({ quality: 85 })
+        .toBuffer();
+      
+      const imageBase64 = resizedBuffer.toString('base64');
+      const imagePath = 'assets/agent-photo.webp';
+      
+      try {
+        const existingImage = await octokit.repos.getContent({
+          owner: ORG,
+          repo: repoName,
+          path: imagePath,
+        });
+        const imageSha = (existingImage.data as any).sha;
+        
+        await octokit.repos.createOrUpdateFileContents({
+          owner: ORG,
+          repo: repoName,
+          path: imagePath,
+          message: 'Update agent photo',
+          content: imageBase64,
+          sha: imageSha,
+        });
+      } catch {
+        await octokit.repos.createOrUpdateFileContents({
+          owner: ORG,
+          repo: repoName,
+          path: imagePath,
+          message: 'Add agent photo',
+          content: imageBase64,
+        });
+      }
+      
+      agentPhotoUrl = `https://raw.githubusercontent.com/${ORG}/${repoName}/main/${imagePath}`;
+      console.log('Agent photo uploaded:', agentPhotoUrl);
+    }
+
+    const html = generateRealEstateHTML({ ...details, agentPhotoUrl });
     const listingsHtml = generateListingsPage(details);
     const blogHtml = generateBlogPage(details);
     const resourcesHtml = generateResourcesPage(details);
